@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from jinja2 import Environment, FileSystemLoader
 import pdfkit
+from prettytable import PrettyTable, ALL
 
 currency_to_rub = {
     "AZN": 35.68,
@@ -75,25 +76,84 @@ dic_cort_key = {'Название': 'name',
                 'Дата публикации вакансии': 'published_at',
                 'Оклад': 'salary'}
 
+l_titles = [
+    '№',
+    'Название',
+    'Описание',
+    'Навыки',
+    'Опыт работы',
+    'Премиум-вакансия',
+    'Компания',
+    'Оклад',
+    'Название региона',
+    'Дата публикации вакансии']
+
+sort_dic = {
+    'Навыки': lambda list, sort_rev: list.sort(key=lambda x: len(x.key_skills.split("\n")), reverse=sort_rev),
+    'Оклад': lambda list, sort_rev: list.sort(key=lambda x: x.salary.salary_avg, reverse=sort_rev),
+    'Опыт работы': lambda list, sort_rev: list.sort(key=lambda x: dic_for_sort[x.experience_id], reverse=sort_rev),
+    'Дата публикации вакансии': lambda list, sort_rev: list.sort(key=lambda x: x.published_at, reverse=sort_rev),
+
+    'Описание': lambda list, sort_rev: list.sort(key=lambda x: x.description, reverse=sort_rev),
+
+    'Название': lambda list, sort_rev: list.sort(key=lambda x: x.name, reverse=sort_rev),
+    'Премиум-вакансия': lambda list, sort_rev: list.sort(key=lambda x: x.premium, reverse=sort_rev),
+    'Компания': lambda list, sort_rev: list.sort(key=lambda x: x.employer_name, reverse=sort_rev),
+
+    'Название региона': lambda list, sort_rev: list.sort(key=lambda x: x.area_name, reverse=sort_rev),
+}
+
+filt_dic = {
+    'Название': lambda vacancy, sign, list: list.append(vacancy)
+                                            if vacancy.name == sign else '',
+    'Описание' : lambda vacancy, sign, list: list.append(vacancy)
+                                            if vacancy.description == sign else '',
+    'Навыки' : lambda vacancy, sign, list: list.append(vacancy)
+                                            if all(x in vacancy.key_skills.split("\n") for x in sign.split(", ")) else '',
+    'Опыт работы' : lambda vacancy, sign, list: list.append(vacancy)
+                                                if dic_words[vacancy.experience_id] == sign else '',
+    'Премиум-вакансия' : lambda vacancy, sign, list: list.append(vacancy)
+                                                    if dic_bool[vacancy.premium] == sign else '',
+    'Компания' : lambda vacancy, sign, list: list.append(vacancy)
+                                            if vacancy.employer_name == sign else '',
+    'Оклад' : lambda vacancy, sign, list: list.append(vacancy)
+                                if ((int(sign) <= int(float(vacancy.salary.salary_to))) & (int(sign) >= int(float(vacancy.salary.salary_from)))) else '',
+    'Название региона' : lambda vacancy, sign, list: list.append(vacancy)
+                                                    if vacancy.area_name == sign else '',
+    'Дата публикации вакансии' : lambda vacancy, sign, list: list.append(vacancy)
+                                            if '.'.join(reversed(vacancy.published_at[0:10].split('-'))) == sign else '',
+    'Идентификатор валюты оклада': lambda vacancy, sign, list: list.append(vacancy)
+                                                    if dic_currency[vacancy.salary.salary_currency] == sign else '',
+    'Оклад указан до вычета налогов': lambda vacancy, sign, list: list.append(vacancy)
+                                                    if dic_bool[vacancy.salary.salary_gross] == sign else ''
+}
 
 
 
 
 class Salary(object):
-    def __init__(self, salary_from: str, salary_to: str, salary_currency: str):
+    def __init__(self, salary_from: str, salary_to: str, salary_currency: str, salary_gross):
         self.salary_from = salary_from
         self.salary_to = salary_to
         self.salary_currency = salary_currency
         self.salary_avg = currency_to_rub[salary_currency] * (float(salary_to) + float(salary_from)) / 2
+        self.salary_gross = salary_gross
 
 
 class Vacancy(object):
 
     def __init__(self, dic):
         self.name = dic['name']
-        self.salary = Salary(dic['salary_from'], dic['salary_to'], dic['salary_currency'])
+        self.salary = Salary(dic['salary_from'], dic['salary_to'], dic['salary_currency'], dic['salary_gross'])
+        self.key_skills = dic['key_skills']
+        self.description = dic['description']
         self.area_name = dic['area_name']
         self.published_at = dic['published_at']
+        self.experience_id = dic['experience_id']
+        self.premium = dic['premium']
+        self.employer_name = dic['employer_name']
+
+
 
     def request_by_str(self, title: str):
         if title == 'name': return self.name
@@ -105,10 +165,15 @@ class Vacancy(object):
     def get_values(self):
         return [
             self.name,
-
+            self.description,
+            self.key_skills,
+            self.experience_id,
+            self.premium,
+            self.employer_name,
             self.salary.salary_avg,
             self.area_name,
-            self.published_at]
+            self.published_at
+            ]
 
 
 class DataSet(object):
@@ -124,7 +189,7 @@ class DataSet(object):
         with open(self.file_name, encoding='utf-8-sig') as r_file:
             file_reader = csv.reader(r_file, delimiter=",")
 
-            flag = True #Переделать... Я пытался
+            flag = True
             for row in file_reader:
                 if flag:
                     self.list_titles = row
@@ -148,14 +213,15 @@ class DataSet(object):
 
                 self.vacancies_objects.append(Vacancy({k: v for k, v in zip(self.list_titles, row)}))
 
+        if user_input.method == 'Статистика':
 
-
-
-
-
-        for element in ['salary_to', 'salary_currency']: # Если что, можно вообще зарание его задать
-            self.list_titles.remove(element)
-        self.list_titles[2] = 'salary'
+            for element in ['salary_to', 'salary_currency']:
+                self.list_titles.remove(element)
+            self.list_titles[2] = 'salary'
+        else:
+            for element in ['salary_to', 'salary_gross', 'salary_currency']:
+                self.list_titles.remove(element)
+            self.list_titles[6] = 'salary'
 
         for i in range(0, len(self.list_titles), 1):
             self.list_titles[i] = dic_naming[self.list_titles[i]]
@@ -168,13 +234,63 @@ class DataSet(object):
                 if filter_data in row.name:
                     self.filter_vac_obj.append(row)
 
+    def filter_tb(self, filter_data_tb):
+        filter_list = filter_data_tb.split(': ')
+
+        if len(filter_list[0]) != 0:
+
+            filtered_vac_obj = []
+
+            ## Сама фильтрация
+
+            for vacancy in self.vacancies_objects:
+                filt_dic[filter_list[0]](vacancy, filter_list[1], filtered_vac_obj)
+
+            if len(filtered_vac_obj) == 0:
+                print("Ничего не найдено")
+                sys.exit(0)
+
+            self.vacancies_objects = filtered_vac_obj
+
+    def sorter(self, sort_rev, sort_data):
+
+        if sort_rev == 'Да':
+            sort_rev = True
+        else:
+            sort_rev = False
+
+        if len(sort_data) != 0:
+            sort_dic[sort_data](self.vacancies_objects, sort_rev)
+
+    def formated(self):
+        for e in self.vacancies_objects:
+            e.experience_id = dic_words[e.experience_id]
+            e.premium = dic_bool[e.premium]
+            e.published_at = '.'.join(reversed(e.published_at[0:10].split('-')))
+            e.salary.salary_gross = dic_gross[e.salary.salary_gross]
+            e.salary.salary_currency = dic_currency[e.salary.salary_currency]
+            e.salary.salary_avg = f'{self.reNumber(e.salary.salary_from)} - {self.reNumber(e.salary.salary_to)} ({e.salary.salary_currency}) ({e.salary.salary_gross})'
+
+    def reNumber(self, number: str):
+        result: str = ''
+        z = number.split(".")[0][::-1]
+        count = len(z) // 3 * 3
+
+        for i in range(0, count, 3):
+            result += " " + z[i:i + 3]
+
+        if not (len(z) % 3 == 0):
+            result = result + " " + z[-(len(z) - count):]
+
+        return result[::-1][:len(result) - 1]
+
     def clust(self, list_vac, value):
         dict = {}
 
 
         for vacancy in list_vac:
             key = vacancy.request_by_str(value)
-            if key in dict:  # Возможно, есть лучший способ
+            if key in dict:
                 dict[key].append(vacancy)
             else:
                 dict[key] = [vacancy]
@@ -231,19 +347,39 @@ class DataSet(object):
 
 class InputConnect(object):
     def __init__(self):
+        self.method = ''
         self.file_name = ''
         self.filter_data = ''
+        self.filter_data_tb = ''
+        self.sort_data = ''
+        self.sort_rev = ''
+        self.numbers_row_inp = ''
+        self.titles_table_inp = ''
 
     def input_processing(self):
-        self.file_name = input("Введите название файла: ")
-        self.filter_data = input("Введите название профессии: ")
+        self.method = input("Введите способ отображения (Вакансии / Статистика): ")
+        if self.method == 'Статистика':
+            self.file_name = input("Введите название файла: ")
+            self.filter_data = input("Введите название профессии: ")
+        elif self.method == 'Вакансии':
+            self.file_name = input("Введите название файла: ")
+            self.filter_data_tb = input("Введите параметр фильтрации: ")
+            self.sort_data = input("Введите параметр сортировки: ")
+            self.sort_rev = input("Обратный порядок сортировки (Да / Нет): ")
+            self.numbers_row_inp = input("Введите диапазон вывода: ")
+            self.titles_table_inp = input("Введите требуемые столбцы: ")
+        else:
+            print('Ввод некорректен')
+            sys.exit(0)
+
+
 
     def validate(self):
         if os.stat(self.file_name).st_size == 0:
             print('Пустой файл')
             sys.exit(0)
 
-        if ( (len(self.filter_data) == 0)):
+        if ( (len(self.filter_data) == 0) & (self.method == 'Статистика')):
             print('Формат ввода некорректен')
             sys.exit(0)
 
@@ -255,11 +391,62 @@ class InputConnect(object):
         print(f'Уровень зарплат по городам (в порядке убывания): {e}')
         print(f'Доля вакансий по городам (в порядке убывания): {f}')
 
+    def print_table(self, data_set: DataSet, numbers_row, titles_table):
+
+        set = data_set.vacancies_objects
+        list_titles = data_set.list_titles
+        list_titles.insert(0, '№')
+
+
+        cropped_set =[]
+        for vacancy in set:
+
+            if len(vacancy.key_skills) > 100:
+                vacancy.key_skills = vacancy.key_skills[:100] + "..."
+            if len(vacancy.description) > 100:
+                vacancy.description = vacancy.description[:100] + "..."
+
+            cropped_set.append(vacancy)
+
+
+        vac_table = PrettyTable(list_titles)
+
+        # Внешний вид таблицы
+        for title in list_titles:
+            vac_table._max_width[title] = 20
+        vac_table.hrules = ALL
+        vac_table.align = "l"
+        #
+
+        counter = 1
+        for e_dict in cropped_set:
+            row = [counter]
+            row.extend(e_dict.get_values())
+            vac_table.add_row(row)
+            counter += 1
+
+        print(vac_table.get_string(start=numbers_row[0] - 1, end=numbers_row[1] - 1, fields=titles_table))
+
+    def parserData(self, count):
+        if len(self.numbers_row_inp) == 0:
+            return [1, count + 1]
+        result = self.numbers_row_inp.split()
+        if len(result) < 2:
+            result.append(count + 1)
+        for e in range(0, len(result), 1):
+            result[e] = int(result[e])
+        return result
+
+    def parserTitles(self):
+        if len(self.titles_table_inp) == 0:
+            return l_titles
+        result = self.titles_table_inp.split(", ")
+        result.insert(0, "№")
+        return result
 
 class Report(object):
     def __init__(self, vacancy_name: str):
         self.vacancy_name = vacancy_name
-
 
     def generate_excel(self, a, b, c, d, e, f):
 
@@ -283,7 +470,6 @@ class Report(object):
 
         file.save('result_file.xlsx')
 
-
     def fillColumn(self, list_t, values, title: str, cell: str):
 
         list_t[cell] = title
@@ -306,7 +492,6 @@ class Report(object):
             list_t[letter + str(number + 1 + i)].border = Border(top=brd, bottom=brd, right=brd, left=brd)
 
         list_t.column_dimensions[letter].width = max_len * 1.3
-
 
     def generate_image(self, a, b, c, d, e, f, name):
         fig = plt.figure(figsize=(18, 10))
@@ -438,41 +623,54 @@ user_input.validate()
 
 data_set = DataSet(user_input.file_name)
 data_set.reader_filer()
-data_set.filter(user_input.filter_data)
 
-year_salary = data_set.get_salary_level(data_set.vacancies_objects, 'published_at')
-year_count = data_set.num_vac(data_set.vacancies_objects)
-if len(data_set.filter_vac_obj) == 0:
-    year_salary_vac = {}
-    for key in year_count:
-        year_salary_vac[key] = 0
-    year_count_vac = year_salary_vac
+
+if user_input.method == 'Статистика':
+
+    data_set.filter(user_input.filter_data)
+
+
+    year_salary = data_set.get_salary_level(data_set.vacancies_objects, 'published_at')
+    year_count = data_set.num_vac(data_set.vacancies_objects)
+    if len(data_set.filter_vac_obj) == 0:
+        year_salary_vac = {}
+        for key in year_count:
+            year_salary_vac[key] = 0
+        year_count_vac = year_salary_vac
+    else:
+        year_salary_vac = data_set.get_salary_level(data_set.filter_vac_obj, 'published_at')
+        year_count_vac = data_set.num_vac(data_set.filter_vac_obj)
+
+
+    area_salary = data_set.get_salary_level(data_set.vacancies_objects, "area_name")
+    area_salary_cut = cut_sort_dict(area_salary, 0, 10)
+
+
+    area_peace = data_set.vac_rate(data_set.clust(data_set.vacancies_objects, "area_name"))
+    area_peace_cut = cut_sort_dict(area_peace, 0, 10)
+
+    area_peace_oth = cut_sort_dict(area_peace, 0, 0)
+    area_peace_oth = get_other_peace(area_peace_oth)
+
+
+    report = Report(user_input.filter_data)
+    '''report.generate_excel(year_salary, year_count, year_salary_vac, year_count_vac, area_salary_cut, area_peace_cut)'''
+
+    '''report.generate_image(year_salary, year_count, year_salary_vac, year_count_vac, area_salary_cut, area_peace_oth, user_input.filter_data)'''
+    report.generate_pdf(year_salary, year_salary_vac, year_count, year_count_vac, area_salary_cut, area_peace_cut)
+
+    user_input.print(year_salary, year_count, year_salary_vac, year_count_vac, area_salary_cut, area_peace_cut)
+
 else:
-    year_salary_vac = data_set.get_salary_level(data_set.filter_vac_obj, 'published_at')
-    year_count_vac = data_set.num_vac(data_set.filter_vac_obj)
+    data_set.filter_tb(user_input.filter_data_tb)
+    data_set.sorter(user_input.sort_rev, user_input.sort_data)
+    data_set.formated()
 
+    titles_table = user_input.parserTitles()
 
-area_salary = data_set.get_salary_level(data_set.vacancies_objects, "area_name")
-area_salary_cut = cut_sort_dict(area_salary, 0, 10)
+    numbers_row = user_input.parserData(len(data_set.vacancies_objects))  # обрезка
 
-
-area_peace = data_set.vac_rate(data_set.clust(data_set.vacancies_objects, "area_name"))
-area_peace_cut = cut_sort_dict(area_peace, 0, 10)
-
-area_peace_oth = cut_sort_dict(area_peace, 0, 0)
-area_peace_oth = get_other_peace(area_peace_oth)
-
-
-report = Report(user_input.filter_data)
-'''report.generate_excel(year_salary, year_count, year_salary_vac, year_count_vac, area_salary_cut, area_peace_cut)'''
-
-'''report.generate_image(year_salary, year_count, year_salary_vac, year_count_vac, area_salary_cut, area_peace_oth, user_input.filter_data)'''
-report.generate_pdf(year_salary, year_salary_vac, year_count, year_count_vac, area_salary_cut, area_peace_cut)
-
-user_input.print(year_salary, year_count, year_salary_vac, year_count_vac, area_salary_cut, area_peace_cut)
-
-#Проба для html
-
+    user_input.print_table(data_set, numbers_row, titles_table)
 
 
 
