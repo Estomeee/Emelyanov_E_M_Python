@@ -105,6 +105,7 @@ class Vacancy(object):
     def get_values(self):
         return [
             self.name,
+
             self.salary.salary_avg,
             self.area_name,
             self.published_at]
