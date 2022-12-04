@@ -11,6 +11,8 @@ from jinja2 import Environment, FileSystemLoader
 import pdfkit
 from prettytable import PrettyTable, ALL
 
+#change for develop
+
 currency_to_rub = {
     "AZN": 35.68,
     "BYR": 23.91,
