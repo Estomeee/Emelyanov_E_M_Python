@@ -11,11 +11,11 @@ from jinja2 import Environment, FileSystemLoader
 import pdfkit
 from prettytable import PrettyTable, ALL
 
-<<<<<<< HEAD
+
 #изменение для main
-=======
+
 #change for develop
->>>>>>> develop
+
 
 currency_to_rub = {
     "AZN": 35.68,
@@ -138,7 +138,22 @@ filt_dic = {
 
 
 class Salary(object):
+    """Класс "Оклад"
+    Attributes:
+        salary_from: Нижняя вилка оклада
+        salary_to: Верхняя вилка оклада
+        salary_currency: Валюта оклада
+        salary_gross: Наличие налогового вычета
+        salary_avg: Среднее значение оклада, переведённое в рубли
+    """
     def __init__(self, salary_from: str, salary_to: str, salary_currency: str, salary_gross):
+        """Инициализация класса "Оклад"
+
+        :param salary_from: Нижняя вилка оклада
+        :param salary_to: Верхняя вилка оклада
+        :param salary_currency: Валюта оклада
+        :param salary_gross: Наличие налогового вычета
+        """
         self.salary_from = salary_from
         self.salary_to = salary_to
         self.salary_currency = salary_currency
@@ -147,8 +162,25 @@ class Salary(object):
 
 
 class Vacancy(object):
-
+    """Класс "Вакансия"
+    Attributes:
+        name (str): Название вакансии
+        salary (Salary): Вилка оклада
+        key_skills (list): Набор требуемых навыков
+        description (str): Описание вакансии
+        area_name (str): Название населённого пункта
+        published_at (str): Дата и время публикации
+        experience_id (str): Требуемый опыт работы
+        premium (bool): Информация о приоритете данной вакансии
+        employer_name (str): Автор публикации
+        request_by_str: Возвращает значение, соответсвующее передаваемому параметру
+        get_values (list): Возвращает список всех данных о вакакнсии
+    """
     def __init__(self, dic):
+        """Инициализация класса "Вакансия"
+
+        :param dic: Словарь, содержащий информацию о данной вакансии
+        """
         self.name = dic['name']
         self.salary = Salary(dic['salary_from'], dic['salary_to'], dic['salary_currency'], dic['salary_gross'])
         self.key_skills = dic['key_skills']
@@ -162,6 +194,11 @@ class Vacancy(object):
 
 
     def request_by_str(self, title: str):
+        """Получение определённой информации о профессии по параметру
+
+        :param title: Ключ, по которому будет возвращено соответсвующее значение
+        :return: Возвращает значение(информация о вакансии) по ключу
+        """
         if title == 'name': return self.name
         if title == 'salary': return self.salary
         if title == 'salary_currency': return dic_currency[self.salary.salary_currency]
@@ -169,6 +206,10 @@ class Vacancy(object):
         if title == 'published_at': return int(self.published_at[0:4])
 
     def get_values(self):
+        """Получение всех данных о конкретной вакансии
+
+        :return: Возвращает список данных о вакансии
+        """
         return [
             self.name,
             self.description,
@@ -183,13 +224,39 @@ class Vacancy(object):
 
 
 class DataSet(object):
+    """Класс "Набор данный"(Набор вакансий из scv)
+    Attributes:
+        file_name (str): Название файла
+        vacancies_objects (list): Список вакансий
+        filter_vac_obj (list): Фильтрованный список вакансий
+        list_titles (list): Список классов информации о вакансиях (список заголовков)
+        reader_filer
+        filter
+        filter_tb
+        sorter
+        formated
+        reNumber
+        clust
+        get_salary_level
+        num_vac
+        vac_rate
+    """
     def __init__(self, file_name: str):
+        """Инициализация класса "Набор вакансий"
+
+        :param file_name: Название файла
+        """
         self.file_name = file_name
         self.vacancies_objects = []
         self.filter_vac_obj = []
         self.list_titles = []
 
+
     def reader_filer(self):
+        """Чтение и отбор вакансий из файла .scv для заполнения vacancies_objects
+
+        :return: Наполняет vacancies_objects. Ничего не возвращает
+        """
         reader = []
 
         with open(self.file_name, encoding='utf-8-sig') as r_file:
@@ -232,7 +299,12 @@ class DataSet(object):
         for i in range(0, len(self.list_titles), 1):
             self.list_titles[i] = dic_naming[self.list_titles[i]]
 
-    def filter(self, filter_data):
+    def filter_name(self, filter_data):
+        """Фильтрация списка вакансий по названию
+
+        :param filter_data: Название вакансии, по которой происходит фильтрация
+        :return: Фильтрует список вакансий по названию. Ничего не возвращает
+        """
 
         if len(filter_data) != 0:
             ## Сама фильтрация
@@ -240,7 +312,13 @@ class DataSet(object):
                 if filter_data in row.name:
                     self.filter_vac_obj.append(row)
 
-    def filter_tb(self, filter_data_tb):
+    def filter(self, filter_data_tb):
+        """Фильтрация списка вакансий по параметру
+
+        :param filter_data_tb: Параметр фильтрации
+        :return: Фильтрует список вакансий. Ничего не возвращает
+        """
+
         filter_list = filter_data_tb.split(': ')
 
         if len(filter_list[0]) != 0:
@@ -259,6 +337,12 @@ class DataSet(object):
             self.vacancies_objects = filtered_vac_obj
 
     def sorter(self, sort_rev, sort_data):
+        """Сортировка по заданныйм параметрам
+
+        :param sort_rev: Инфармация о необхомости обратной сортировки
+        :param sort_data: Параметр сортировки
+        :return: Сортирует список вакансий. Ничего не возвращает
+        """
 
         if sort_rev == 'Да':
             sort_rev = True
@@ -269,6 +353,10 @@ class DataSet(object):
             sort_dic[sort_data](self.vacancies_objects, sort_rev)
 
     def formated(self):
+        """Форматирование данных вакансии
+
+        :return: Форматирует список вакансий. Ничего не возвращает
+        """
         for e in self.vacancies_objects:
             e.experience_id = dic_words[e.experience_id]
             e.premium = dic_bool[e.premium]
@@ -278,6 +366,11 @@ class DataSet(object):
             e.salary.salary_avg = f'{self.reNumber(e.salary.salary_from)} - {self.reNumber(e.salary.salary_to)} ({e.salary.salary_currency}) ({e.salary.salary_gross})'
 
     def reNumber(self, number: str):
+        """Приведение числа к виду для вывода
+
+        :param number: Число
+        :return: Приведенное к нужному виду для вывода число
+        """
         result: str = ''
         z = number.split(".")[0][::-1]
         count = len(z) // 3 * 3
@@ -291,6 +384,12 @@ class DataSet(object):
         return result[::-1][:len(result) - 1]
 
     def clust(self, list_vac, value):
+        """Разделение вакансий на группы по заданому параметру
+
+        :param list_vac: Список вакансий
+        :param value: Параметр группировки
+        :return: Словарь вакансий
+        """
         dict = {}
 
 
@@ -313,6 +412,12 @@ class DataSet(object):
         return dict
 
     def get_salary_level(self, list_vac, value):
+        """Получение уровня зарплат по параметру(годам/городам)
+
+        :param list_vac: Список вакансий
+        :param value: Параметр
+        :return: Словарь с уровнем зарплат по параметру(годам/городам)
+        """
 
         dict = self.clust(list_vac, value)
         result_dict = {}
@@ -329,7 +434,11 @@ class DataSet(object):
 
 
     def num_vac(self, list_vac):
+        """Получение статистики по кол-ву вакансий пр годам
 
+        :param list_vac: Список вакансий
+        :return: Словарь со статистикой кол-ва вакансий по годам
+        """
         dict_years = self.clust(list_vac, 'published_at')
 
         result_dict_years = {}
@@ -340,6 +449,11 @@ class DataSet(object):
         return result_dict_years
 
     def vac_rate(self, dict_input):
+        """Получений статистики по долям вакансий
+
+        :param dict_input: Словарь со статистикой кол-ва ваканский по городам
+        :return: Словарь со статистикой по распределению ваканский по городам
+        """
 
         dict = {}
 
@@ -352,7 +466,27 @@ class DataSet(object):
 
 
 class InputConnect(object):
+    """Класс для взаимодействия с пользователем
+    Atrributes:
+        method (str): Метод обраьотки данных
+        file_name (str): Название файла
+        filter_data (str): Название исследуеммой вакансии
+        filter_data_tb (str): Параметр фильтрации
+        sort_data (str): Параметр сортировки
+        sort_rev (str): Пораметр необхожимости обратной сортировки
+        numbers_row_inp (str): Диапазон выводимых строк таблицы
+        titles_table_inp (str): Диапазон вывдимых столбцов(заголовков) таблицы
+        input_processing: Получение входящих данный
+        validate: Проверка введённых данных на корректность
+        print: Вывод статистики в консоль
+        print_table: Вывод таблицы в консоль
+        parserData: Преобразование введенного ползователем диапазона выводимых строк
+        parserTitles: Преобразование введенного ползователем диапазона(заголовков) выводимых столбцов
+    """
     def __init__(self):
+        """Инициализация класса для ввзаимодействия с пользователем
+
+        """
         self.method = ''
         self.file_name = ''
         self.filter_data = ''
@@ -363,6 +497,10 @@ class InputConnect(object):
         self.titles_table_inp = ''
 
     def input_processing(self):
+        """Получение входящих данный
+
+        :return: Ничего не возвращает
+        """
         self.method = input("Введите способ отображения (Вакансии / Статистика): ")
         if self.method == 'Статистика':
             self.file_name = input("Введите название файла: ")
@@ -378,9 +516,11 @@ class InputConnect(object):
             print('Ввод некорректен')
             sys.exit(0)
 
-
-
     def validate(self):
+        """Проверка введённых данных на корректность
+
+        :return: Завершает код в случаее ввода некоректных данных
+        """
         if os.stat(self.file_name).st_size == 0:
             print('Пустой файл')
             sys.exit(0)
@@ -390,6 +530,16 @@ class InputConnect(object):
             sys.exit(0)
 
     def print(self, a, b, c, d, e, f):
+        """Вывод статистики в консоль
+
+        :param a: Динамика уровня зарплат по годам
+        :param b: Динамика количества вакансий по годам
+        :param c: Динамика уровня зарплат по годам для выбранной профессии
+        :param d: Динамика количества вакансий по годам для выбранной профессии
+        :param e: Уровень зарплат по городам (в порядке убывания)
+        :param f: Доля вакансий по городам (в порядке убывания)
+        :return: Вывод статистики в консоль
+        """
         print(f'Динамика уровня зарплат по годам: {a}')
         print(f'Динамика количества вакансий по годам: {b}')
         print(f'Динамика уровня зарплат по годам для выбранной профессии: {c}')
@@ -398,6 +548,13 @@ class InputConnect(object):
         print(f'Доля вакансий по городам (в порядке убывания): {f}')
 
     def print_table(self, data_set: DataSet, numbers_row, titles_table):
+        """Вывод таблицы в консоль
+
+        :param data_set: Набор данный(Набор вакансий из scv)
+        :param numbers_row: Диапазон выводимых в таблице строк(вакансий)
+        :param titles_table: Названия столбцов, которые необходимо вывести
+        :return: Вывод таблицы в консоль
+        """
 
         set = data_set.vacancies_objects
         list_titles = data_set.list_titles
@@ -434,6 +591,11 @@ class InputConnect(object):
         print(vac_table.get_string(start=numbers_row[0] - 1, end=numbers_row[1] - 1, fields=titles_table))
 
     def parserData(self, count):
+        """Преобразование введенного ползователем диапазона выводимых строк
+
+        :param count: Кол-во вакансий в наборе данных
+        :return: Список из первого и второго чисел диапазона
+        """
         if len(self.numbers_row_inp) == 0:
             return [1, count + 1]
         result = self.numbers_row_inp.split()
@@ -444,6 +606,10 @@ class InputConnect(object):
         return result
 
     def parserTitles(self):
+        """Преобразование введенного ползователем диапазона(заголовков) выводимых столбцов
+
+        :return: Список заголовков столбцов таблицы, которые необходимо вывести
+        """
         if len(self.titles_table_inp) == 0:
             return l_titles
         result = self.titles_table_inp.split(", ")
@@ -455,6 +621,16 @@ class Report(object):
         self.vacancy_name = vacancy_name
 
     def generate_excel(self, a, b, c, d, e, f):
+        """Создаёт .xlsx файл(таблицу) со всей статистикой
+
+        :param a: Динамика уровня зарплат по годам
+        :param b: Динамика количества вакансий по годам
+        :param c: Динамика уровня зарплат по годам для выбранной профессии
+        :param d: Динамика количества вакансий по годам для выбранной профессии
+        :param e: Уровень зарплат по городам (в порядке убывания)
+        :param f: Доля вакансий по городам (в порядке убывания)
+        :return: Создаёт .xlsx файл(таблицу) со всей статистикой
+        """
 
         file = pxl.Workbook()
         list_t = file.active
@@ -477,7 +653,14 @@ class Report(object):
         file.save('result_file.xlsx')
 
     def fillColumn(self, list_t, values, title: str, cell: str):
+        """Заполнение столбцов .xlms файла
 
+        :param list_t: Лист .xlms файла
+        :param values: Список значений, которыми будет заполнен столбец
+        :param title: Заголовк столбца
+        :param cell: Ячека начала столбца
+        :return: Заполняет столбец .xlms файла
+        """
         list_t[cell] = title
 
         list_t[cell].font = Font(bold = True)
@@ -500,6 +683,17 @@ class Report(object):
         list_t.column_dimensions[letter].width = max_len * 1.3
 
     def generate_image(self, a, b, c, d, e, f, name):
+        """Создание .png файл(изображение с графиками) со всей статистикой
+
+        :param a: Динамика уровня зарплат по годам
+        :param b: Динамика количества вакансий по годам
+        :param c: Динамика уровня зарплат по годам для выбранной профессии
+        :param d: Динамика количества вакансий по годам для выбранной профессии
+        :param e: Уровень зарплат по городам (в порядке убывания)
+        :param f: Доля вакансий по городам (в порядке убывания)
+        :param name: Название исследуемой професии
+        :return: Создаёт .png файл(изображение с графиками) со всей статистикой
+        """
         fig = plt.figure(figsize=(18, 10))
         plt.rcParams['font.size'] = '8'
 
@@ -555,6 +749,16 @@ class Report(object):
         fig.savefig('graph.png')
 
     def generate_pdf(self, year_salary, year_salary_vac, year_count, year_count_vac, area_salary_cut, area_peace_cut):
+        """Создание .pdf файла со всей статистикой
+
+        :param year_salary: Динамика уровня зарплат по годам
+        :param year_salary_vac: Динамика количества вакансий по годам
+        :param year_count: Динамика уровня зарплат по годам для выбранной профессии
+        :param year_count_vac: Динамика количества вакансий по годам для выбранной профессии
+        :param area_salary_cut: Уровень зарплат по городам (в порядке убывания)
+        :param area_peace_cut: Доля вакансий по городам (в порядке убывания)
+        :return: Создаёт .pdf файл со всей статистикой
+        """
         name = user_input.filter_data
         stat_years = []
         for i in range(0, len(year_salary), 1):
@@ -598,6 +802,13 @@ class Report(object):
         pdfkit.from_string(pdf_template, 'report.pdf', configuration=config, options={'enable-local-file-access': None})
 
 def cut_sort_dict(dic, num1, num2):
+    """Преобразование(обрезка и сортировка) статистики по городам
+
+    :param dic: Словарь со статистикой по городам
+    :param num1: Первое число диапазона обрезки
+    :param num2: Второе число диапазона обрезки
+    :return: Преобразованный словарь
+    """
     new_dic = list(dic.items())
     new_dic.sort(key=lambda x: x[1], reverse=True)
     if num2 == 0:
@@ -607,6 +818,11 @@ def cut_sort_dict(dic, num1, num2):
     return dict(new_dic)
 
 def get_other_peace(dic):
+    """Преобразование(сведение городов с малым кол-вом вакансиий к группе 'Другие') статистики по городам
+
+    :param dic: Словарь со статистикой по городам
+    :return: Преобразованный словарь со статистикой по городам
+    """
 
     other = dict((list(dic.items()))[10:])
     sum = 0
@@ -633,7 +849,7 @@ data_set.reader_filer()
 
 if user_input.method == 'Статистика':
 
-    data_set.filter(user_input.filter_data)
+    data_set.filter_name(user_input.filter_data)
 
 
     year_salary = data_set.get_salary_level(data_set.vacancies_objects, 'published_at')
@@ -668,7 +884,7 @@ if user_input.method == 'Статистика':
     user_input.print(year_salary, year_count, year_salary_vac, year_count_vac, area_salary_cut, area_peace_cut)
 
 else:
-    data_set.filter_tb(user_input.filter_data_tb)
+    data_set.filter(user_input.filter_data_tb)
     data_set.sorter(user_input.sort_rev, user_input.sort_data)
     data_set.formated()
 
