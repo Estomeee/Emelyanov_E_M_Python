@@ -81,11 +81,6 @@ dic_cort_key = {'Название': 'name',
                 'Оклад': 'salary'}
 l_titles = [
     '№',
-    'Название',
-    'Описание',
-    'Навыки',
-    'Опыт работы',
-    'Премиум-вакансия',
     'Компания',
     'Оклад',
     'Название региона',
@@ -140,7 +135,7 @@ class Salary(object):
         salary_gross: Наличие налогового вычета
         salary_avg: Среднее значение оклада, переведённое в рубли
     """
-    def __init__(self, salary_from: str, salary_to: str, salary_currency: str, salary_gross):
+    def __init__(self, salary_from: str, salary_to: str, salary_currency: str):
         """Инициализация класса "Оклад"
 
         :param salary_from: Нижняя вилка оклада
@@ -152,7 +147,7 @@ class Salary(object):
         self.salary_to = salary_to
         self.salary_currency = salary_currency
         self.salary_avg = currency_to_rub[salary_currency] * (float(salary_to) + float(salary_from)) / 2
-        self.salary_gross = salary_gross
+
 
 
 class Vacancy(object):
@@ -176,14 +171,14 @@ class Vacancy(object):
         :param dic: Словарь, содержащий информацию о данной вакансии
         """
         self.name = dic['name']
-        self.salary = Salary(dic['salary_from'], dic['salary_to'], dic['salary_currency'], dic['salary_gross'])
-        self.key_skills = dic['key_skills']
-        self.description = dic['description']
+        self.salary = Salary(dic['salary_from'], dic['salary_to'], dic['salary_currency'])
+
+
         self.area_name = dic['area_name']
         self.published_at = dic['published_at']
-        self.experience_id = dic['experience_id']
-        self.premium = dic['premium']
-        self.employer_name = dic['employer_name']
+
+
+
 
 
 
@@ -206,11 +201,7 @@ class Vacancy(object):
         """
         return [
             self.name,
-            self.description,
-            self.key_skills,
-            self.experience_id,
-            self.premium,
-            self.employer_name,
+
             self.salary.salary_avg,
             self.area_name,
             self.published_at
@@ -283,11 +274,23 @@ class DataSet(object):
 
         if self.method == 'Статистика':
 
+            vac_years = self.clust(self.vacancies_objects, 'published_at')
+            path = "chanks"
+
+            for e in vac_years:
+                current_out_writer = csv.writer(open(path + '/' + str(e) + '.csv', 'w', encoding='utf-8-sig'),
+                                                delimiter=",",
+                                                lineterminator="\r")
+                current_out_writer.writerow(self.list_titles)
+                for i in vac_years[e]:
+                    current_out_writer.writerow(i.get_values())
+
+
             for element in ['salary_to', 'salary_currency']:
                 self.list_titles.remove(element)
             self.list_titles[2] = 'salary'
         else:
-            for element in ['salary_to', 'salary_gross', 'salary_currency']:
+            for element in ['salary_to', 'salary_currency']:
                 self.list_titles.remove(element)
             self.list_titles[6] = 'salary'
 
@@ -358,12 +361,12 @@ class DataSet(object):
         :return: Форматирует список вакансий. Ничего не возвращает
         """
         for e in self.vacancies_objects:
-            e.experience_id = dic_words[e.experience_id]
-            e.premium = dic_bool[e.premium]
-            e.published_at = self.date_form2(e.published_at)
-            e.salary.salary_gross = dic_gross[e.salary.salary_gross]
+
+
+            e.published_at = self.date_form1(e.published_at)
+
             e.salary.salary_currency = dic_currency[e.salary.salary_currency]
-            e.salary.salary_avg = f'{self.reNumber(e.salary.salary_from)} - {self.reNumber(e.salary.salary_to)} ({e.salary.salary_currency}) ({e.salary.salary_gross})'
+            e.salary.salary_avg = f'{self.reNumber(e.salary.salary_from)} - {self.reNumber(e.salary.salary_to)} ({e.salary.salary_currency}))'
 
     def date_form1(self, date):
         return '.'.join(reversed(date[0:10].split('-')))
@@ -508,46 +511,28 @@ class InputConnect(object):
         self.numbers_row_inp = ''
         self.titles_table_inp = ''
 
-        '''  def input_processing(self):
-            """Получение входящих данный
-        
-            :return: Ничего не возвращает
-            """
-            self.method = input("Введите способ отображения (Вакансии / Статистика): ")
-            if self.method == 'Статистика':
-                self.file_name = input("Введите название файла: ")
-                self.filter_data = input("Введите название профессии: ")
-            elif self.method == 'Вакансии':
-                self.file_name = input("Введите название файла: ")
-                self.filter_data_tb = input("Введите параметр фильтрации: ")
-                self.sort_data = input("Введите параметр сортировки: ")
-                self.sort_rev = input("Обратный порядок сортировки (Да / Нет): ")
-                self.numbers_row_inp = input("Введите диапазон вывода: ")
-                self.titles_table_inp = input("Введите требуемые столбцы: ")
-            else:
-                print('Ввод некорректен')
-                sys.exit(0) '''
-
-
     def input_processing(self):
         """Получение входящих данный
 
         :return: Ничего не возвращает
         """
-        self.method = "Вакансии"
+        self.method = input("Введите способ отображения (Вакансии / Статистика): ")
         if self.method == 'Статистика':
             self.file_name = input("Введите название файла: ")
             self.filter_data = input("Введите название профессии: ")
         elif self.method == 'Вакансии':
-            self.file_name = 'vacancies_big2.csv'
-            self.filter_data_tb = 'Оклад: 100000'
-            self.sort_data = 'Оклад'
-            self.sort_rev = ''
-            self.numbers_row_inp = ''
-            self.titles_table_inp = ''
+            self.file_name = input("Введите название файла: ")
+            self.filter_data_tb = input("Введите параметр фильтрации: ")
+            self.sort_data = input("Введите параметр сортировки: ")
+            self.sort_rev = input("Обратный порядок сортировки (Да / Нет): ")
+            self.numbers_row_inp = input("Введите диапазон вывода: ")
+            self.titles_table_inp = input("Введите требуемые столбцы: ")
         else:
             print('Ввод некорректен')
             sys.exit(0)
+
+
+
 
     def validate(self):
         """Проверка введённых данных на корректность
@@ -595,27 +580,27 @@ class InputConnect(object):
 
 
         cropped_set =[]
-        for vacancy in set:
+        '''for vacancy in set:
 
             if len(vacancy.key_skills) > 100:
                 vacancy.key_skills = vacancy.key_skills[:100] + "..."
             if len(vacancy.description) > 100:
                 vacancy.description = vacancy.description[:100] + "..."
 
-            cropped_set.append(vacancy)
+            cropped_set.append(vacancy)'''
 
 
-        vac_table = PrettyTable(list_titles)
+        vac_table = PrettyTable(l_titles)
 
         # Внешний вид таблицы
-        for title in list_titles:
+        for title in l_titles:
             vac_table._max_width[title] = 20
         vac_table.hrules = ALL
         vac_table.align = "l"
         #
 
         counter = 1
-        for e_dict in cropped_set:
+        for e_dict in set:
             row = [counter]
             row.extend(e_dict.get_values())
             vac_table.add_row(row)
@@ -831,7 +816,7 @@ class Report(object):
                                         'stat_area_peace': stat_area_peace})
 
         config = pdfkit.configuration(
-            wkhtmltopdf=r'C:\Users\Пользователь\PycharmProjects\3\wkhtmltopdf\bin\wkhtmltopdf.exe')
+            wkhtmltopdf=r'C:\Users\Пользователь\PycharmProjects\Emelyanov_E_M\wkhtmltopdf\bin\wkhtmltopdf.exe')
         pdfkit.from_string(pdf_template, 'report.pdf', configuration=config, options={'enable-local-file-access': None})
 
 def cut_sort_dict(dic, num1, num2):
@@ -867,60 +852,56 @@ def get_other_peace(dic):
 
 
 # Основной код
-def main():
-        # Ввод и обработка некорректных данных
-        user_input = InputConnect()
-        user_input.input_processing()
-        user_input.validate()
 
-        # Делаем
-        data_set = DataSet(user_input.file_name, user_input.method)
-        data_set.reader_filer()
+# Ввод и обработка некорректных данных
+user_input = InputConnect()
+user_input.input_processing()
+user_input.validate()
 
-        if user_input.method == 'Статистика':
+# Делаем
+data_set = DataSet(user_input.file_name, user_input.method)
+data_set.reader_filer()
 
-            data_set.filter_name(user_input.filter_data)
+if user_input.method == 'Статистика':
 
-            year_salary = data_set.get_salary_level(data_set.vacancies_objects, 'published_at')
-            year_count = data_set.num_vac(data_set.vacancies_objects)
-            if len(data_set.filter_vac_obj) == 0:
-                year_salary_vac = {}
-                for key in year_count:
-                    year_salary_vac[key] = 0
-                year_count_vac = year_salary_vac
-            else:
-                year_salary_vac = data_set.get_salary_level(data_set.filter_vac_obj, 'published_at')
-                year_count_vac = data_set.num_vac(data_set.filter_vac_obj)
+    data_set.filter_name(user_input.filter_data)
 
-            area_salary = data_set.get_salary_level(data_set.vacancies_objects, "area_name")
-            area_salary_cut = cut_sort_dict(area_salary, 0, 10)
+    year_salary = data_set.get_salary_level(data_set.vacancies_objects, 'published_at')
+    year_count = data_set.num_vac(data_set.vacancies_objects)
+    if len(data_set.filter_vac_obj) == 0:
+        year_salary_vac = {}
+        for key in year_count:
+            year_salary_vac[key] = 0
+        year_count_vac = year_salary_vac
+    else:
+        year_salary_vac = data_set.get_salary_level(data_set.filter_vac_obj, 'published_at')
+        year_count_vac = data_set.num_vac(data_set.filter_vac_obj)
 
-            area_peace = data_set.vac_rate(data_set.clust(data_set.vacancies_objects, "area_name"))
-            area_peace_cut = cut_sort_dict(area_peace, 0, 10)
+    area_salary = data_set.get_salary_level(data_set.vacancies_objects, "area_name")
+    area_salary_cut = cut_sort_dict(area_salary, 0, 10)
 
-            area_peace_oth = cut_sort_dict(area_peace, 0, 0)
-            area_peace_oth = get_other_peace(area_peace_oth)
+    area_peace = data_set.vac_rate(data_set.clust(data_set.vacancies_objects, "area_name"))
+    area_peace_cut = cut_sort_dict(area_peace, 0, 10)
 
-            report = Report(user_input.filter_data)
-            '''report.generate_excel(year_salary, year_count, year_salary_vac, year_count_vac, area_salary_cut, area_peace_cut)'''
+    area_peace_oth = cut_sort_dict(area_peace, 0, 0)
+    area_peace_oth = get_other_peace(area_peace_oth)
 
-            '''report.generate_image(year_salary, year_count, year_salary_vac, year_count_vac, area_salary_cut, area_peace_oth, user_input.filter_data)'''
-            report.generate_pdf(year_salary, year_salary_vac, year_count, year_count_vac, area_salary_cut, area_peace_cut)
+    report = Report(user_input.filter_data)
+    '''report.generate_excel(year_salary, year_count, year_salary_vac, year_count_vac, area_salary_cut, area_peace_cut)'''
 
-            user_input.print(year_salary, year_count, year_salary_vac, year_count_vac, area_salary_cut, area_peace_cut)
+    '''report.generate_image(year_salary, year_count, year_salary_vac, year_count_vac, area_salary_cut, area_peace_oth, user_input.filter_data)'''
+    report.generate_pdf(year_salary, year_salary_vac, year_count, year_count_vac, area_salary_cut, area_peace_cut)
 
-        else:
-            data_set.filter(user_input.filter_data_tb)
-            data_set.sorter(user_input.sort_rev, user_input.sort_data)
-            data_set.formated()
+    user_input.print(year_salary, year_count, year_salary_vac, year_count_vac, area_salary_cut, area_peace_cut)
 
-            titles_table = user_input.parserTitles()
+else:
+    data_set.filter(user_input.filter_data_tb)
+    data_set.sorter(user_input.sort_rev, user_input.sort_data)
+    data_set.formated()
 
-            numbers_row = user_input.parserData(len(data_set.vacancies_objects))  # обрезка
+    titles_table = user_input.parserTitles()
 
-            user_input.print_table(data_set, numbers_row, titles_table)
+    numbers_row = user_input.parserData(len(data_set.vacancies_objects))  # обрезка
 
+    user_input.print_table(data_set, numbers_row, titles_table)
 
-if __name__ == "__main__":
-    main()
-    cProfile.run('main()')
