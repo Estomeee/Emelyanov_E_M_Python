@@ -4,6 +4,8 @@ import math
 import re
 import os
 import sys
+from multiprocessing import Pool
+
 import openpyxl as pxl
 from openpyxl.styles import Font, Border, Side
 import matplotlib.pyplot as plt
@@ -201,8 +203,20 @@ class Vacancy(object):
         """
         return [
             self.name,
-
             self.salary.salary_avg,
+            self.area_name,
+            self.published_at
+            ]
+    def get_all_values(self):
+        """Получение всех данных о конкретной вакансии
+
+        :return: Возвращает список данных о вакансии
+        """
+        return [
+            self.name,
+            self.salary.salary_from,
+            self.salary.salary_to,
+            self.salary.salary_currency,
             self.area_name,
             self.published_at
             ]
@@ -237,6 +251,56 @@ class DataSet(object):
         self.list_titles = []
         self.method = method
 
+    def stat_years_multi(self, data):
+        '''прочитать файл
+        привести к словарю
+        выполнить 4 функции(скопировать из тела)'''
+
+        file_name = data.split(',')[0]
+        filter_data = data.split(',')[1]
+
+        reader = []
+        list_year = []
+
+        with open(file_name, encoding='utf-8-sig') as r_file:
+            file_reader = csv.reader(r_file, delimiter=",")
+
+            flag = True
+            for row in file_reader:
+                if flag:
+                    self.list_titles = row
+                    flag = False
+                else:
+                    reader.append(row)
+
+        for row in reader:
+            if ((len(row) == len(self.list_titles)) & (not ((None in row) | ("" in row)))):
+                list_year.append(Vacancy({k: v for k, v in zip(self.list_titles, row)}))
+
+        filtered_list = self.filter_for_multi(list_year, filter_data)
+
+        year_salary = self.get_salary_level(list_year, 'published_at')
+        year_count = self.num_vac(list_year)
+        if len(filtered_list) == 0:
+            year_salary_vac = {}
+            for key in year_count:
+                year_salary_vac[key] = 0
+            year_count_vac = year_salary_vac
+        else:
+            year_salary_vac = self.get_salary_level(filtered_list, 'published_at')
+            year_count_vac = self.num_vac(filtered_list)
+
+        return year_salary, year_count, year_salary_vac, year_count_vac
+
+
+    def filter_for_multi(self, list, filter_data):
+        filter_list = []
+        if len(filter_data) != 0:
+            ## Сама фильтрация
+            for row in list:
+                if filter_data in row.name:
+                    filter_list.append(row)
+        return filter_list
 
     def reader_filer(self):
         """Чтение и отбор вакансий из файла .scv для заполнения vacancies_objects
@@ -273,7 +337,6 @@ class DataSet(object):
                 self.vacancies_objects.append(Vacancy({k: v for k, v in zip(self.list_titles, row)}))
 
         if self.method == 'Статистика':
-
             vac_years = self.clust(self.vacancies_objects, 'published_at')
             path = "chanks"
 
@@ -283,8 +346,7 @@ class DataSet(object):
                                                 lineterminator="\r")
                 current_out_writer.writerow(self.list_titles)
                 for i in vac_years[e]:
-                    current_out_writer.writerow(i.get_values())
-
+                    current_out_writer.writerow(i.get_all_values())
 
             for element in ['salary_to', 'salary_currency']:
                 self.list_titles.remove(element)
@@ -766,7 +828,7 @@ class Report(object):
 
         fig.savefig('graph.png')
 
-    def generate_pdf(self, year_salary, year_salary_vac, year_count, year_count_vac, area_salary_cut, area_peace_cut):
+    def generate_pdf(self, filter_data, year_salary, year_salary_vac, year_count, year_count_vac, area_salary_cut, area_peace_cut):
         """Создание .pdf файла со всей статистикой
 
         :param year_salary: Динамика уровня зарплат по годам
@@ -777,7 +839,7 @@ class Report(object):
         :param area_peace_cut: Доля вакансий по городам (в порядке убывания)
         :return: Создаёт .pdf файл со всей статистикой
         """
-        name = user_input.filter_data
+        name = filter_data
         stat_years = []
         for i in range(0, len(year_salary), 1):
             an_item = dict(date=list(year_salary.keys())[i],
@@ -852,56 +914,62 @@ def get_other_peace(dic):
 
 
 # Основной код
+def main():
+    # Ввод и обработка некорректных данных
+    user_input = InputConnect()
+    user_input.input_processing()
+    user_input.validate()
 
-# Ввод и обработка некорректных данных
-user_input = InputConnect()
-user_input.input_processing()
-user_input.validate()
+    # Делаем
+    data_set = DataSet(user_input.file_name, user_input.method)
+    data_set.reader_filer()
 
-# Делаем
-data_set = DataSet(user_input.file_name, user_input.method)
-data_set.reader_filer()
+    if user_input.method == 'Статистика':
 
-if user_input.method == 'Статистика':
+        data_set.filter_name(user_input.filter_data)
 
-    data_set.filter_name(user_input.filter_data)
+        chanks_files = list(map(lambda x: 'chanks/' + x + ',' + user_input.filter_data,
+                                next(os.walk('chanks'), (None, None, []))[2]))
 
-    year_salary = data_set.get_salary_level(data_set.vacancies_objects, 'published_at')
-    year_count = data_set.num_vac(data_set.vacancies_objects)
-    if len(data_set.filter_vac_obj) == 0:
-        year_salary_vac = {}
-        for key in year_count:
-            year_salary_vac[key] = 0
-        year_count_vac = year_salary_vac
+        pool = Pool(processes=2)
+
+        year_salary, year_count, year_salary_vac, year_count_vac = {}, {}, {}, {}
+        heap = pool.map(data_set.stat_years_multi, chanks_files)
+
+        for e in heap:
+            year_salary[list(e[0].keys())[0]] = list(e[0].values())[0]
+            year_count[list(e[1].keys())[0]] = list(e[1].values())[0]
+            year_salary_vac[list(e[2].keys())[0]] = list(e[2].values())[0]
+            year_count_vac[list(e[3].keys())[0]] = list(e[3].values())[0]
+
+        area_salary = data_set.get_salary_level(data_set.vacancies_objects, "area_name")
+        area_salary_cut = cut_sort_dict(area_salary, 0, 10)
+
+        area_peace = data_set.vac_rate(data_set.clust(data_set.vacancies_objects, "area_name"))
+        area_peace_cut = cut_sort_dict(area_peace, 0, 10)
+
+        area_peace_oth = cut_sort_dict(area_peace, 0, 0)
+        area_peace_oth = get_other_peace(area_peace_oth)
+
+        report = Report(user_input.filter_data)
+        '''report.generate_excel(year_salary, year_count, year_salary_vac, year_count_vac, area_salary_cut, area_peace_cut)'''
+
+        '''report.generate_image(year_salary, year_count, year_salary_vac, year_count_vac, area_salary_cut, area_peace_oth, user_input.filter_data)'''
+        report.generate_pdf(user_input.filter_data, year_salary, year_salary_vac, year_count, year_count_vac, area_salary_cut, area_peace_cut)
+
+        user_input.print(year_salary, year_count, year_salary_vac, year_count_vac, area_salary_cut, area_peace_cut)
+
     else:
-        year_salary_vac = data_set.get_salary_level(data_set.filter_vac_obj, 'published_at')
-        year_count_vac = data_set.num_vac(data_set.filter_vac_obj)
+        data_set.filter(user_input.filter_data_tb)
+        data_set.sorter(user_input.sort_rev, user_input.sort_data)
+        data_set.formated()
 
-    area_salary = data_set.get_salary_level(data_set.vacancies_objects, "area_name")
-    area_salary_cut = cut_sort_dict(area_salary, 0, 10)
+        titles_table = user_input.parserTitles()
 
-    area_peace = data_set.vac_rate(data_set.clust(data_set.vacancies_objects, "area_name"))
-    area_peace_cut = cut_sort_dict(area_peace, 0, 10)
+        numbers_row = user_input.parserData(len(data_set.vacancies_objects))  # обрезка
 
-    area_peace_oth = cut_sort_dict(area_peace, 0, 0)
-    area_peace_oth = get_other_peace(area_peace_oth)
+        user_input.print_table(data_set, numbers_row, titles_table)
 
-    report = Report(user_input.filter_data)
-    '''report.generate_excel(year_salary, year_count, year_salary_vac, year_count_vac, area_salary_cut, area_peace_cut)'''
 
-    '''report.generate_image(year_salary, year_count, year_salary_vac, year_count_vac, area_salary_cut, area_peace_oth, user_input.filter_data)'''
-    report.generate_pdf(year_salary, year_salary_vac, year_count, year_count_vac, area_salary_cut, area_peace_cut)
-
-    user_input.print(year_salary, year_count, year_salary_vac, year_count_vac, area_salary_cut, area_peace_cut)
-
-else:
-    data_set.filter(user_input.filter_data_tb)
-    data_set.sorter(user_input.sort_rev, user_input.sort_data)
-    data_set.formated()
-
-    titles_table = user_input.parserTitles()
-
-    numbers_row = user_input.parserData(len(data_set.vacancies_objects))  # обрезка
-
-    user_input.print_table(data_set, numbers_row, titles_table)
-
+if __name__ == "__main__":
+    cProfile.run('main()')
