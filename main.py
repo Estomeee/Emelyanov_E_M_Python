@@ -1,4 +1,5 @@
 import csv
+from concurrent.futures import ProcessPoolExecutor
 from datetime import datetime
 import math
 import re
@@ -931,7 +932,7 @@ def main():
         chanks_files = list(map(lambda x: 'chanks/' + x + ',' + user_input.filter_data,
                                 next(os.walk('chanks'), (None, None, []))[2]))
 
-        pool = Pool(processes=2)
+        pool = ProcessPoolExecutor(max_workers=6)
 
         year_salary, year_count, year_salary_vac, year_count_vac = {}, {}, {}, {}
         heap = pool.map(data_set.stat_years_multi, chanks_files)
